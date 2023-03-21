@@ -1,13 +1,14 @@
 import logging
 import os
 
-from telegram import constants
-from telegram import Update, InlineQueryResultArticle, InputTextMessageContent, BotCommand
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, \
-    filters, InlineQueryHandler, Application
-
-from pydub import AudioSegment
+import hdext
 from openai_helper import OpenAIHelper
+from pydub import AudioSegment
+from telegram import (BotCommand, InlineQueryResultArticle,
+                      InputTextMessageContent, Update, constants)
+from telegram.ext import (Application, ApplicationBuilder, CommandHandler,
+                          ContextTypes, InlineQueryHandler, MessageHandler,
+                          filters)
 from usage_tracker import UsageTracker
 
 
@@ -27,8 +28,10 @@ class ChatGPT3TelegramBot:
         self.commands = [
             BotCommand(command='help', description='Show help message'),
             BotCommand(command='reset', description='Reset the conversation'),
-            BotCommand(command='image', description='Generate image from prompt (e.g. /image cat)'),
-            BotCommand(command='stats', description='Get your current usage statistics')
+            BotCommand(
+                command='image', description='Generate image from prompt (e.g. /image cat)'),
+            BotCommand(command='stats',
+                       description='Get your current usage statistics')
         ]
         self.disallowed_message = "Sorry, you are not allowed to use this bot. You can check out the source code at " \
                                   "https://github.com/n3d1117/chatgpt-telegram-bot"
@@ -39,7 +42,8 @@ class ChatGPT3TelegramBot:
         """
         Shows the help menu.
         """
-        commands = [f'/{command.command} - {command.description}' for command in self.commands]
+        commands = [
+            f'/{command.command} - {command.description}' for command in self.commands]
         help_text = 'I\'m a ChatGPT bot, talk to me!' + \
                     '\n\n' + \
                     '\n'.join(commands) + \
@@ -49,37 +53,42 @@ class ChatGPT3TelegramBot:
                     "Open source at https://github.com/n3d1117/chatgpt-telegram-bot"
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
-
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Returns token usage statistics for current day and month.
         """
         if not await self.is_allowed(update):
-            logging.warning(f'User {update.message.from_user.name} is not allowed to request their usage statistics')
+            logging.warning(
+                f'User {update.message.from_user.name} is not allowed to request their usage statistics')
             await self.send_disallowed_message(update, context)
             return
 
-        logging.info(f'User {update.message.from_user.name} requested their token usage statistics')
-        
+        logging.info(
+            f'User {update.message.from_user.name} requested their token usage statistics')
+
         user_id = update.message.from_user.id
         if user_id not in self.usage:
-            self.usage[user_id] = UsageTracker(user_id, update.message.from_user.name)
+            self.usage[user_id] = UsageTracker(
+                user_id, update.message.from_user.name)
 
-        tokens_today, tokens_month = self.usage[user_id].get_current_token_usage()
-        images_today, images_month = self.usage[user_id].get_current_image_count()
-        transcribe_durations = self.usage[user_id].get_current_transcription_duration()
+        tokens_today, tokens_month = self.usage[user_id].get_current_token_usage(
+        )
+        images_today, images_month = self.usage[user_id].get_current_image_count(
+        )
+        transcribe_durations = self.usage[user_id].get_current_transcription_duration(
+        )
         cost_today, cost_month = self.usage[user_id].get_current_cost()
-        
-        usage_text = f"Today:\n"+\
-                     f"{tokens_today} chat tokens used.\n"+\
-                     f"{images_today} images generated.\n"+\
-                     f"{transcribe_durations[0]} minutes and {transcribe_durations[1]} seconds transcribed.\n"+\
-                     f"💰 For a total amount of ${cost_today:.2f}\n"+\
-                     f"\n----------------------------\n\n"+\
-                     f"This month:\n"+\
-                     f"{tokens_month} chat tokens used.\n"+\
-                     f"{images_month} images generated.\n"+\
-                     f"{transcribe_durations[2]} minutes and {transcribe_durations[3]} seconds transcribed.\n"+\
+
+        usage_text = f"Today:\n" +\
+                     f"{tokens_today} chat tokens used.\n" +\
+                     f"{images_today} images generated.\n" +\
+                     f"{transcribe_durations[0]} minutes and {transcribe_durations[1]} seconds transcribed.\n" +\
+                     f"💰 For a total amount of ${cost_today:.2f}\n" +\
+                     f"\n----------------------------\n\n" +\
+                     f"This month:\n" +\
+                     f"{tokens_month} chat tokens used.\n" +\
+                     f"{images_month} images generated.\n" +\
+                     f"{transcribe_durations[2]} minutes and {transcribe_durations[3]} seconds transcribed.\n" +\
                      f"💰 For a total amount of ${cost_month:.2f}"
         await update.message.reply_text(usage_text)
 
@@ -88,11 +97,13 @@ class ChatGPT3TelegramBot:
         Resets the conversation.
         """
         if not await self.is_allowed(update):
-            logging.warning(f'User {update.message.from_user.name} is not allowed to reset the conversation')
+            logging.warning(
+                f'User {update.message.from_user.name} is not allowed to reset the conversation')
             await self.send_disallowed_message(update, context)
             return
 
-        logging.info(f'Resetting the conversation for user {update.message.from_user.name}...')
+        logging.info(
+            f'Resetting the conversation for user {update.message.from_user.name}...')
 
         chat_id = update.effective_chat.id
         self.openai.reset_chat_history(chat_id=chat_id)
@@ -103,22 +114,25 @@ class ChatGPT3TelegramBot:
         Generates an image for the given prompt using DALL·E APIs
         """
         if not await self.is_allowed(update):
-            logging.warning(f'User {update.message.from_user.name} is not allowed to generate images')
+            logging.warning(
+                f'User {update.message.from_user.name} is not allowed to generate images')
             await self.send_disallowed_message(update, context)
             return
 
         if not await self.is_within_budget(update):
-            logging.warning(f'User {update.message.from_user.name} reached their usage limit')
+            logging.warning(
+                f'User {update.message.from_user.name} reached their usage limit')
             await self.send_budget_reached_message(update, context)
             return
-        
+
         chat_id = update.effective_chat.id
         image_query = update.message.text.replace('/image', '').strip()
         if image_query == '':
             await context.bot.send_message(chat_id=chat_id, text='Please provide a prompt! (e.g. /image cat)')
             return
 
-        logging.info(f'New image generation request received from user {update.message.from_user.name}')
+        logging.info(
+            f'New image generation request received from user {update.message.from_user.name}')
 
         await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.UPLOAD_PHOTO)
         try:
@@ -130,10 +144,12 @@ class ChatGPT3TelegramBot:
             )
             # add image request to users usage tracker
             user_id = update.message.from_user.id
-            self.usage[user_id].add_image_request(image_size, self.config['image_prices'])
+            self.usage[user_id].add_image_request(
+                image_size, self.config['image_prices'])
             # add guest chat request to guest usage tracker
             if str(user_id) not in self.config['allowed_user_ids'].split(',') and 'guests' in self.usage:
-                self.usage["guests"].add_image_request(image_size, self.config['image_prices'])
+                self.usage["guests"].add_image_request(
+                    image_size, self.config['image_prices'])
 
         except Exception as e:
             logging.exception(e)
@@ -148,12 +164,14 @@ class ChatGPT3TelegramBot:
         Transcribe audio messages.
         """
         if not await self.is_allowed(update):
-            logging.warning(f'User {update.message.from_user.name} is not allowed to transcribe audio messages')
+            logging.warning(
+                f'User {update.message.from_user.name} is not allowed to transcribe audio messages')
             await self.send_disallowed_message(update, context)
             return
-        
+
         if not await self.is_within_budget(update):
-            logging.warning(f'User {update.message.from_user.name} reached their usage limit')
+            logging.warning(
+                f'User {update.message.from_user.name} reached their usage limit')
             await self.send_budget_reached_message(update, context)
             return
 
@@ -183,7 +201,8 @@ class ChatGPT3TelegramBot:
         try:
             audio_track = AudioSegment.from_file(filename)
             audio_track.export(filename_mp3, format="mp3")
-            logging.info(f'New transcribe request received from user {update.message.from_user.name}')
+            logging.info(
+                f'New transcribe request received from user {update.message.from_user.name}')
 
         except Exception as e:
             logging.exception(e)
@@ -200,7 +219,8 @@ class ChatGPT3TelegramBot:
 
         user_id = update.message.from_user.id
         if user_id not in self.usage:
-            self.usage[user_id] = UsageTracker(user_id, update.message.from_user.name)
+            self.usage[user_id] = UsageTracker(
+                user_id, update.message.from_user.name)
 
         # send decoded audio to openai
         try:
@@ -210,12 +230,14 @@ class ChatGPT3TelegramBot:
 
             # add transcription seconds to usage tracker
             transcription_price = self.config['transcription_price']
-            self.usage[user_id].add_transcription_seconds(audio_track.duration_seconds, transcription_price)
+            self.usage[user_id].add_transcription_seconds(
+                audio_track.duration_seconds, transcription_price)
 
             # add guest chat request to guest usage tracker
             allowed_user_ids = self.config['allowed_user_ids'].split(',')
             if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
-                self.usage["guests"].add_transcription_seconds(audio_track.duration_seconds, transcription_price)
+                self.usage["guests"].add_transcription_seconds(
+                    audio_track.duration_seconds, transcription_price)
 
             if self.config['voice_reply_transcript']:
 
@@ -239,10 +261,12 @@ class ChatGPT3TelegramBot:
                 response, total_tokens = response
 
                 # add chat request to users usage tracker
-                self.usage[user_id].add_chat_tokens(total_tokens, self.config['token_price'])
+                self.usage[user_id].add_chat_tokens(
+                    total_tokens, self.config['token_price'])
                 # add guest chat request to guest usage tracker
                 if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
-                    self.usage["guests"].add_chat_tokens(total_tokens, self.config['token_price'])
+                    self.usage["guests"].add_chat_tokens(
+                        total_tokens, self.config['token_price'])
 
                 # Split into chunks of 4096 characters (Telegram's message limit)
                 transcript_output = f'_Transcript:_\n"{transcript}"\n\n_Answer:_\n{response}'
@@ -255,6 +279,7 @@ class ChatGPT3TelegramBot:
                         text=transcript_chunk,
                         parse_mode=constants.ParseMode.MARKDOWN
                     )
+                await hdext.send_voice(update=update, text=response)
 
         except Exception as e:
             logging.exception(e)
@@ -275,16 +300,19 @@ class ChatGPT3TelegramBot:
         React to incoming messages and respond accordingly.
         """
         if not await self.is_allowed(update):
-            logging.warning(f'User {update.message.from_user.name} is not allowed to use the bot')
+            logging.warning(
+                f'User {update.message.from_user.name} is not allowed to use the bot')
             await self.send_disallowed_message(update, context)
             return
 
         if not await self.is_within_budget(update):
-            logging.warning(f'User {update.message.from_user.name} reached their usage limit')
+            logging.warning(
+                f'User {update.message.from_user.name} reached their usage limit')
             await self.send_budget_reached_message(update, context)
             return
-        
-        logging.info(f'New message received from user {update.message.from_user.name}')
+
+        logging.info(
+            f'New message received from user {update.message.from_user.name}')
         chat_id = update.effective_chat.id
         user_id = update.message.from_user.id
         prompt = update.message.text
@@ -294,7 +322,8 @@ class ChatGPT3TelegramBot:
             if prompt.startswith(trigger_keyword):
                 prompt = prompt[len(trigger_keyword):].strip()
             else:
-                logging.warning('Message does not start with trigger keyword, ignoring...')
+                logging.warning(
+                    'Message does not start with trigger keyword, ignoring...')
                 return
 
         await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.TYPING)
@@ -312,11 +341,13 @@ class ChatGPT3TelegramBot:
         response, total_tokens = response
 
         # add chat request to users usage tracker
-        self.usage[user_id].add_chat_tokens(total_tokens, self.config['token_price'])
+        self.usage[user_id].add_chat_tokens(
+            total_tokens, self.config['token_price'])
         # add guest chat request to guest usage tracker
         allowed_user_ids = self.config['allowed_user_ids'].split(',')
         if str(user_id) not in allowed_user_ids and 'guests' in self.usage:
-            self.usage["guests"].add_chat_tokens(total_tokens, self.config['token_price'])
+            self.usage["guests"].add_chat_tokens(
+                total_tokens, self.config['token_price'])
 
         # Split into chunks of 4096 characters (Telegram's message limit)
         chunks = self.split_into_chunks(response)
@@ -328,6 +359,9 @@ class ChatGPT3TelegramBot:
                 text=chunk,
                 parse_mode=constants.ParseMode.MARKDOWN
             )
+        logging.info(
+            f'send voice {response}')
+        await hdext.send_voice(update=update, text=response)
 
     async def inline_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
@@ -347,7 +381,6 @@ class ChatGPT3TelegramBot:
                 thumb_url='https://user-images.githubusercontent.com/11541888/223106202-7576ff11-2c8e-408d-94ea-b02a7a32149a.png'
             )
         ]
-
         await update.inline_query.answer(results)
 
     async def send_disallowed_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -412,9 +445,11 @@ class ChatGPT3TelegramBot:
         if self.is_group_chat(update):
             for user in allowed_user_ids:
                 if await self.is_user_in_group(update, user):
-                    logging.info(f'{user} is a member. Allowing group chat message...')
+                    logging.info(
+                        f'{user} is a member. Allowing group chat message...')
                     return True
-            logging.info(f'Group chat messages from user {update.message.from_user.name} are not allowed')
+            logging.info(
+                f'Group chat messages from user {update.message.from_user.name} are not allowed')
 
         return False
 
@@ -425,7 +460,8 @@ class ChatGPT3TelegramBot:
         """
         user_id = update.message.from_user.id
         if user_id not in self.usage:
-            self.usage[user_id] = UsageTracker(user_id, update.message.from_user.name)
+            self.usage[user_id] = UsageTracker(
+                user_id, update.message.from_user.name)
 
         if self.config['monthly_user_budgets'] == '*':
             return True
@@ -437,7 +473,8 @@ class ChatGPT3TelegramBot:
             user_budgets = self.config['monthly_user_budgets'].split(',')
             # check if user is included in budgets list
             if len(user_budgets) <= user_index:
-                logging.warning(f'No budget set for user: {update.message.from_user.name} ({user_id}).')
+                logging.warning(
+                    f'No budget set for user: {update.message.from_user.name} ({user_id}).')
                 return False
             user_budget = float(user_budgets[user_index])
             cost_month = self.usage[user_id].get_current_cost()[1]
@@ -449,12 +486,15 @@ class ChatGPT3TelegramBot:
             for user in allowed_user_ids:
                 if await self.is_user_in_group(update, user):
                     if 'guests' not in self.usage:
-                        self.usage['guests'] = UsageTracker('guests', 'all guest users in group chats')
+                        self.usage['guests'] = UsageTracker(
+                            'guests', 'all guest users in group chats')
                     if self.config['monthly_guest_budget'] >= self.usage['guests'].get_current_cost()[1]:
                         return True
-                    logging.warning('Monthly guest budget for group chats used up.')
+                    logging.warning(
+                        'Monthly guest budget for group chats used up.')
                     return False
-            logging.info(f'Group chat messages from user {update.message.from_user.name} are not allowed')
+            logging.info(
+                f'Group chat messages from user {update.message.from_user.name} are not allowed')
         return False
 
     def split_into_chunks(self, text: str, chunk_size: int = 4096) -> list[str]:
@@ -489,7 +529,8 @@ class ChatGPT3TelegramBot:
             filters.AUDIO | filters.VOICE | filters.Document.AUDIO |
             filters.VIDEO | filters.VIDEO_NOTE | filters.Document.VIDEO,
             self.transcribe))
-        application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.prompt))
+        application.add_handler(MessageHandler(
+            filters.TEXT & (~filters.COMMAND), self.prompt))
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
             constants.ChatType.GROUP, constants.ChatType.SUPERGROUP
         ]))
