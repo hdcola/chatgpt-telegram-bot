@@ -1,14 +1,15 @@
 import logging
 import os
 
+import cmds
 import hdext
 from openai_helper import OpenAIHelper
 from pydub import AudioSegment
 from telegram import (BotCommand, InlineQueryResultArticle,
                       InputTextMessageContent, Update, constants)
-from telegram.ext import (Application, ApplicationBuilder, CommandHandler,
-                          ContextTypes, InlineQueryHandler, MessageHandler,
-                          filters)
+from telegram.ext import (Application, ApplicationBuilder,
+                          CallbackQueryHandler, CommandHandler, ContextTypes,
+                          InlineQueryHandler, MessageHandler, filters)
 from usage_tracker import UsageTracker
 
 
@@ -31,7 +32,9 @@ class ChatGPT3TelegramBot:
             BotCommand(
                 command='image', description='Generate image from prompt (e.g. /image cat)'),
             BotCommand(command='stats',
-                       description='Get your current usage statistics')
+                       description='Get your current usage statistics'),
+            BotCommand(command='settings',
+                       description='Change your settings')
         ]
         self.disallowed_message = "Sorry, you are not allowed to use this bot. You can check out the source code at " \
                                   "https://github.com/n3d1117/chatgpt-telegram-bot"
@@ -519,10 +522,10 @@ class ChatGPT3TelegramBot:
             .get_updates_proxy_url(self.config['proxy']) \
             .post_init(self.post_init) \
             .build()
-
+        application.add_handler(CommandHandler('settings', cmds.settings))
         application.add_handler(CommandHandler('reset', self.reset))
         application.add_handler(CommandHandler('help', self.help))
-        application.add_handler(CommandHandler('image', self.image))
+        # application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('start', self.help))
         application.add_handler(CommandHandler('stats', self.stats))
         application.add_handler(MessageHandler(
@@ -534,6 +537,7 @@ class ChatGPT3TelegramBot:
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
             constants.ChatType.GROUP, constants.ChatType.SUPERGROUP
         ]))
+        application.add_handler(CallbackQueryHandler(cmds.button_handler))
 
         application.add_error_handler(self.error_handler)
 

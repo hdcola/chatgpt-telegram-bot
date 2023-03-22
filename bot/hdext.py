@@ -1,5 +1,6 @@
 import io
 
+import database as db
 import edge_tts
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -18,7 +19,7 @@ async def conv_voice(
 
 
 async def send_voice(update: Update, text: str) -> None:
-    comm = edge_tts.Communicate(text, "zh-CN-liaoning-XiaobeiNeural")
+    comm = edge_tts.Communicate(text, db.voice(update.effective_chat.id))
     with io.BytesIO() as out:
         async for message in comm.stream():
             if message["type"] == "audio":
