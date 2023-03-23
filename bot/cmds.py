@@ -56,7 +56,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         db.add_user(cid)
     btn_lst = [
         ut.button([("Language/Voice", "lang_menu")]),
-        ut.button([("Conversation style", "style_menu")]),
+        # ut.button([("Conversation style", "style_menu")]),
         ut.button([("Toggle TTS", "tts_menu")]),
     ]
     resp = ut.send

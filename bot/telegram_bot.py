@@ -2,6 +2,7 @@ import logging
 import os
 
 import cmds
+import database as db
 import hdext
 from openai_helper import OpenAIHelper
 from pydub import AudioSegment
@@ -374,9 +375,9 @@ class ChatGPT3TelegramBot:
                 text=chunk,
                 parse_mode=constants.ParseMode.MARKDOWN
             )
-        logging.info(
-            f'send voice {response}')
-        await hdext.send_voice(update=update, text=response)
+        if db.tts(update._effective_chat.id) == 1:
+            await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.RECORD_VOICE)
+            await hdext.send_voice(update=update, text=response)
 
     async def inline_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
