@@ -10,7 +10,6 @@ import json
 import logging
 import re
 import traceback
-from functools import partial
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Union
 
@@ -18,8 +17,6 @@ import aiohttp
 import database as db
 import edge_tts
 from aiohttp.web import HTTPException
-from dateutil.parser import isoparse
-from EdgeGPT import Chatbot, ConversationStyle
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, Message,
                       Update, constants)
 from telegram.constants import ParseMode
