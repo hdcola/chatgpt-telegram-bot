@@ -9,7 +9,6 @@ import logging
 
 import database as db
 import utils as ut
-from EdgeGPT import ConversationStyle
 from telegram import Update, constants
 from telegram.ext import ContextTypes
 
@@ -158,35 +157,6 @@ async def voice_menu(
         await resp(
             update,
             f"Your current voice is <b>{cur_voice}</b>\n\n" f"Voices",
-            reply_markup=ut.markup(btn_lst),
-        )
-
-
-async def style_menu(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    cid = ut.cid(update)
-    if db.cached(cid):
-        cur_style = db.style(cid)
-        btn_lst = [
-            ut.button(
-                [
-                    (
-                        st.name if st.name != cur_style else f"» {st.name} «",
-                        f"style_set_{st.name}",
-                    )
-                ]
-            )
-            for st in ConversationStyle
-        ]
-        btn_lst.append(ut.button([("« Back to Settings", "settings_menu")]))
-        resp = ut.send
-        if update.callback_query is not None:
-            resp = ut.edit
-        await resp(
-            update,
-            f"Your current conversation style is <b>{cur_style}</b>\n\n"
-            f"Styles",
             reply_markup=ut.markup(btn_lst),
         )
 
