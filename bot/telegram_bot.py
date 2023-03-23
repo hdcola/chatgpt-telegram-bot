@@ -28,13 +28,11 @@ class ChatGPT3TelegramBot:
         self.openai = openai
         self.commands = [
             BotCommand(command='help', description='Show help message'),
-            BotCommand(command='reset', description='Reset the conversation'),
-            # BotCommand(
-            #     command='image', description='Generate image from prompt (e.g. /image cat)'),
+            BotCommand(command='reset', description='Reset the conversation. Optionally pass high-level instructions for the conversation (e.g. /reset You are a helpful assistant)'),
+            BotCommand(
+                command='image', description='Generate image from prompt (e.g. /image cat)'),
             BotCommand(command='stats',
-                       description='Get your current usage statistics'),
-            BotCommand(command='settings',
-                       description='Change your settings')
+                       description='Get your current usage statistics')
         ]
         self.disallowed_message = "Sorry, you are not allowed to use this bot. You can check out the source code at " \
                                   "https://github.com/n3d1117/chatgpt-telegram-bot"
@@ -82,6 +80,10 @@ class ChatGPT3TelegramBot:
         )
         cost_today, cost_month = self.usage[user_id].get_current_cost()
 
+        chat_id = update.effective_chat.id
+        chat_messages, chat_token_length = self.openai.get_conversation_stats(
+            chat_id)
+
         usage_text = f"Today:\n" +\
                      f"{tokens_today} chat tokens used.\n" +\
                      f"{images_today} images generated.\n" +\
@@ -92,7 +94,11 @@ class ChatGPT3TelegramBot:
                      f"{tokens_month} chat tokens used.\n" +\
                      f"{images_month} images generated.\n" +\
                      f"{transcribe_durations[2]} minutes and {transcribe_durations[3]} seconds transcribed.\n" +\
-                     f"💰 For a total amount of ${cost_month:.2f}"
+                     f"💰 For a total amount of ${cost_month:.2f}" +\
+                     f"\n----------------------------\n\n" +\
+                     f"Current conversation:\n" +\
+                     f"{chat_messages} chat messages in history.\n" +\
+                     f"{chat_token_length} chat tokens in history.\n"
         await update.message.reply_text(usage_text)
 
     async def reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,7 +115,8 @@ class ChatGPT3TelegramBot:
             f'Resetting the conversation for user {update.message.from_user.name}...')
 
         chat_id = update.effective_chat.id
-        self.openai.reset_chat_history(chat_id=chat_id)
+        reset_content = update.message.text.replace('/reset', '').strip()
+        self.openai.reset_chat_history(chat_id=chat_id, content=reset_content)
         await context.bot.send_message(chat_id=chat_id, text='Done!')
 
     async def image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -325,9 +332,12 @@ class ChatGPT3TelegramBot:
             if prompt.startswith(trigger_keyword):
                 prompt = prompt[len(trigger_keyword):].strip()
             else:
-                logging.warning(
-                    'Message does not start with trigger keyword, ignoring...')
-                return
+                if update.message.reply_to_message and update.message.reply_to_message.from_user.id == context.bot.id:
+                    logging.info('Message is a reply to the bot, allowing...')
+                else:
+                    logging.warning(
+                        'Message does not start with trigger keyword, ignoring...')
+                    return
 
         await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.TYPING)
 
@@ -409,7 +419,7 @@ class ChatGPT3TelegramBot:
         """
         Handles errors in the telegram-python-bot library.
         """
-        logging.debug(f'Exception while handling an update: {context.error}')
+        logging.error(f'Exception while handling an update: {context.error}')
 
     def is_group_chat(self, update: Update) -> bool:
         """
